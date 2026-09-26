@@ -1,0 +1,31 @@
+flowchart TB
+    Admin["Admin\nAWS SSO + Session Manager"]
+
+    subgraph VPC["VPC — eu-west-1"]
+        subgraph SubnetA["Private Subnet A (AZ-a)"]
+            EC2["EC2: PostgreSQL 15\n(source, synthetic workload)"]
+        end
+
+        subgraph SubnetB["Private Subnet B (AZ-b)"]
+            DMS["AWS DMS\nreplication instance\n(full-load-and-cdc)"]
+        end
+
+        Aurora["Aurora PostgreSQL 15.19\nwriter (+ optional reader, AZ-b)"]
+
+        Endpoints["Interface endpoints:\nSecrets Manager, SSM,\nEC2 Messages, SSM Messages"]
+        S3EP["Gateway endpoint: S3\n(validation exports / state)"]
+        Obs["CloudWatch Logs/Metrics/Alarms\nKMS keys · VPC Flow Logs"]
+    end
+
+    Admin -->|Session Manager, no SSH| EC2
+    EC2 <-->|TLS / 5432\nlogical WAL| DMS
+    DMS -->|TLS / 5432| Aurora
+
+    EC2 -.-> Endpoints
+    DMS -.-> Endpoints
+    EC2 -.-> S3EP
+
+    classDef priv fill:#1e293b,stroke:#64748b,color:#e2e8f0;
+    classDef db fill:#0f766e,stroke:#134e4a,color:#fff;
+    class EC2,DMS priv;
+    class Aurora db;

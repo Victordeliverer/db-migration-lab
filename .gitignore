@@ -1,0 +1,50 @@
+# --- Terraform ---
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# Keep lock files committed (per Day 1 exit gate) — do NOT ignore these:
+# .terraform.lock.hcl
+
+# tfvars often hold environment-specific (sometimes sensitive) values
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# --- Python (scripts/seed.py, workload.py, validate.py) ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# --- Secrets / credentials — never commit these, regardless of source ---
+*.pem
+*.key
+.env
+.env.*
+!.env.example
+**/secrets.yml
+**/secrets.yaml
+aws-credentials*
+
+# --- Evidence artifacts that are large/binary/regeneratable ---
+docs/evidence/*.log
+*.dump
+
+# --- macOS ---
+.DS_Store
+
+# --- Editor ---
+.vscode/
+.idea/
