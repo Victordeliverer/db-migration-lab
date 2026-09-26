@@ -1,0 +1,86 @@
+name: Terraform CI
+
+on:
+  pull_request:
+    paths:
+      - "terraform/**"
+      - ".github/workflows/terraform.yml"
+  push:
+    branches: [main]
+    paths:
+      - "terraform/**"
+
+permissions:
+  id-token: write   # required to request the OIDC token
+  contents: read
+  pull-requests: write  # allows the plan-comment step to post on the PR
+
+env:
+  TF_VERSION: "1.16.2"
+  AWS_REGION: "eu-west-1"
+
+jobs:
+  static-checks:
+    name: fmt / validate / tflint / checkov
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        stack: [bootstrap, envs/lab]
+    defaults:
+      run:
+        working-directory: terraform/${{ matrix.stack }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: terraform fmt -check
+        run: terraform fmt -check -recursive
+
+      - name: terraform init (no backend, for validate only)
+        run: terraform init -backend=false
+
+      - name: terraform validate
+        run: terraform validate
+
+      - name: tflint
+        uses: terraform-linters/setup-tflint@v4
+      - run: tflint --init && tflint
+
+      - name: checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: terraform/${{ matrix.stack }}
+          quiet: true
+          soft_fail: false   # fail the build on any high-severity finding
+
+  plan:
+    name: terraform plan (envs/lab)
+    needs: static-checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform/envs/lab
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      # OIDC — assumes the role created in terraform/bootstrap/github-oidc.tf.
+      # No AWS access keys anywhere in this workflow or in GitHub secrets.
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_CI_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - run: terraform init
+      - run: terraform plan -no-color -input=false
+        # Read-only role: this can only ever plan, never apply, in CI.
+        # Apply stays a deliberate local/manual action for this lab.
+
